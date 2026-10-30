@@ -15,65 +15,47 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col justify-between">
 
-    <!-- Header con enlace de regreso al Escáner -->
-    <header class="bg-indigo-600 text-white shadow-md p-4 flex justify-between items-center">
-        <h1 class="text-xl font-bold">📊 Panel de Control - Asistencia</h1>
-        <a href="/" class="bg-indigo-700 hover:bg-indigo-800 px-4 py-2 rounded-lg text-sm font-semibold transition">
-            📷 Ir al Escáner
-        </a>
+   <header class="bg-indigo-600 text-white shadow-md p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold">📊 Dashboard de Asistencias</h1>
+        <div class="space-x-2">
+            <a href="/" class="bg-indigo-700 hover:bg-indigo-800 px-3 py-2 rounded-lg text-sm font-semibold transition">Escanear QR 📷</a>
+            <a href="/generador" class="bg-indigo-700 hover:bg-indigo-800 px-3 py-2 rounded-lg text-sm font-semibold transition">Generar QR 🛠️</a>
+        </div>
     </header>
 
     <!-- Contenido Principal -->
-    <main class="container mx-auto p-4 max-w-4xl flex-grow space-y-6">
-        
-        <!-- Tarjetas de Resumen Estadístico -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-blue-500">
-                <p class="text-sm font-medium text-gray-500">Total Invitados</p>
-                <p id="totalRegistros" class="text-3xl font-extrabold text-gray-800">0</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-green-500">
-                <p class="text-sm font-medium text-gray-500">Han Ingresado</p>
-                <p id="totalIngresados" class="text-3xl font-extrabold text-green-600">0</p>
-            </div>
-            <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-orange-500">
-                <p class="text-sm font-medium text-gray-500">Pendientes</p>
-                <p id="totalPendientes" class="text-3xl font-extrabold text-orange-500">0</p>
-            </div>
-        </div>
-
-        <!-- Barra de Control: Buscador y Botón de Recarga -->
-        <div class="bg-white p-4 rounded-xl shadow-md flex flex-col sm:flex-row gap-3 justify-between items-center">
-            <input type="text" id="inputBuscar" oninput="filtrarTabla()" placeholder="🔍 Buscar por nombre o código..." 
-                   class="w-full sm:w-1/2 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+    <main class="container mx-auto p-4 max-w-4xl flex-grow">
+        <div class="bg-white rounded-xl shadow-lg p-6 space-y-4">
             
-            <button onclick="cargarDatosDashboard()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-medium transition flex items-center justify-center gap-2">
-                🔄 Actualizar Datos
-            </button>
-        </div>
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold text-gray-800">Lista de Asistentes Registrados</h2>
+                <button onclick="cargarDashboard()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium transition">
+                    🔄 Actualizar
+                </button>
+            </div>
 
-        <!-- Tabla de Asistentes -->
-        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            <!-- Tabla de Asistentes -->
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
-                        <tr class="bg-gray-100 text-gray-700 uppercase text-xs tracking-wider border-b border-gray-200">
-                            <th class="py-3 px-4">Código / CI</th>
-                            <th class="py-3 px-4">Nombre del Asistente</th>
-                            <th class="py-3 px-4">Estado</th>
-                            <th class="py-3 px-4">Hora de Ingreso</th>
+                        <tr class="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            <th class="p-3">QR</th>
+                            <th class="p-3">Celular (Código)</th>
+                            <th class="p-3">Nombre</th>
+                            <th class="p-3">Estado</th>
+                            <th class="p-3">Hora de Ingreso</th>
                         </tr>
                     </thead>
-                    <tbody id="tablaCuerpo" class="divide-y divide-gray-200 text-sm">
-                        <!-- Se puebla dinámicamente desde JavaScript -->
+                    <tbody id="tablaAsistentes" class="divide-y divide-gray-200 text-sm">
+                        <!-- Los datos se cargan dinámicamente con JS -->
                         <tr>
-                            <td colspan="4" class="py-6 text-center text-gray-400">Cargando datos...</td>
+                            <td colspan="5" class="p-4 text-center text-gray-500">Cargando datos...</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-        </div>
 
+        </div>
     </main>
 
     <!-- Footer -->
@@ -81,99 +63,53 @@
         Sistema de Control de Asistencia &copy; 2026
     </footer>
 
-    <!-- Lógica JavaScript -->
+    <!-- Lógica JS para cargar datos -->
     <script>
-        let todosLosAsistentes = [];
-
-        // Cargar datos al iniciar la página
-        document.addEventListener("DOMContentLoaded", cargarDatosDashboard);
-
-        async function cargarDatosDashboard() {
+        async function cargarDashboard() {
             try {
                 const response = await fetch('/api/dashboard-data');
-                if (!response.ok) throw new Error("Error en la respuesta del servidor");
-                
                 const data = await response.json();
-                todosLosAsistentes = data.asistentes || [];
+                const tbody = document.getElementById('tablaAsistentes');
+                tbody.innerHTML = "";
 
-                actualizarMetricas();
-                renderizarTabla(todosLosAsistentes);
+                if (data.asistentes.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">No hay asistentes registrados.</td></tr>`;
+                    return;
+                }
 
-            } catch (error) {
-                console.error("Error al obtener datos:", error);
-                document.getElementById('tablaCuerpo').innerHTML = `
-                    <tr>
-                        <td colspan="4" class="py-6 text-center text-red-500 font-semibold">
-                            ❌ No se pudieron cargar los datos del servidor.
+                data.asistentes.forEach(asistente => {
+                    const tr = document.createElement('tr');
+                    
+                    // Definir color del estado
+                    const badgeClass = asistente.status === "Entró" 
+                        ? "bg-green-100 text-green-800" 
+                        : "bg-yellow-100 text-yellow-800";
+
+                    tr.innerHTML = `
+                        <td class="p-3">
+                            <a href="/api/generar-qr/${asistente.codigo}" target="_blank" title="Ver QR grande">
+                                <img src="/api/generar-qr/${asistente.codigo}" alt="QR" class="w-12 h-12 border rounded bg-white p-1 hover:scale-110 transition shadow-sm">
+                            </a>
                         </td>
-                    </tr>`;
+                        <td class="p-3 font-medium text-gray-900">${asistente.codigo}</td>
+                        <td class="p-3 text-gray-700">${asistente.name}</td>
+                        <td class="p-3">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${badgeClass}">
+                                ${asistente.status}
+                            </span>
+                        </td>
+                        <td class="p-3 text-gray-500">${asistente.timestamp}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error("Error al cargar el dashboard:", err);
             }
         }
 
-        function actualizarMetricas() {
-            const total = todosLosAsistentes.length;
-            const ingresados = todosLosAsistentes.filter(a => a.status === 'Entró').length;
-            const pendientes = total - ingresados;
-
-            document.getElementById('totalRegistros').textContent = total;
-            document.getElementById('totalIngresados').textContent = ingresados;
-            document.getElementById('totalPendientes').textContent = pendientes;
-        }
-
-        function renderizarTabla(lista) {
-            const tablaCuerpo = document.getElementById('tablaCuerpo');
-            tablaCuerpo.innerHTML = "";
-
-            if (lista.length === 0) {
-                tablaCuerpo.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="py-6 text-center text-gray-400">
-                            No se encontraron registros.
-                        </td>
-                    </tr>`;
-                return;
-            }
-
-            lista.forEach(asistente => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-50 transition";
-
-                const esEntro = asistente.status === "Entró";
-                const badgeClass = esEntro 
-                    ? "bg-green-100 text-green-800 font-semibold" 
-                    : "bg-orange-100 text-orange-800 font-semibold";
-
-                tr.innerHTML = `
-                    <td class="py-3 px-4 font-mono font-medium text-gray-700">${asistente.codigo}</td>
-                    <td class="py-3 px-4 font-semibold text-gray-800">${asistente.name}</td>
-                    <td class="py-3 px-4">
-                        <span class="px-2.5 py-1 rounded-full text-xs ${badgeClass}">
-                            ${asistente.status}
-                        </span>
-                    </td>
-                    <td class="py-3 px-4 text-gray-500 font-mono">${asistente.timestamp}</td>
-                `;
-                tablaCuerpo.appendChild(tr);
-            });
-        }
-
-        function filtrarTabla() {
-            const busqueda = document.getElementById('inputBuscar').value.toLowerCase().trim();
-            const filtrados = todosLosAsistentes.filter(a => 
-                a.name.toLowerCase().includes(busqueda) || 
-                a.codigo.toLowerCase().includes(busqueda)
-            );
-            renderizarTabla(filtrados);
-        }
+        // Cargar al abrir la página y refrescar cada 10 segundos automáticamente
+        cargarDashboard();
+        setInterval(cargarDashboard, 10000);
     </script>
-    <script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/static/sw.js')
-                .then(reg => console.log('Service Worker registrado con éxito', reg))
-                .catch(err => console.log('Error al registrar Service Worker', err));
-        });
-    }
-</script>
 </body>
 </html>
