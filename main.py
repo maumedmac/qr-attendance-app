@@ -1,12 +1,12 @@
 import os
 import datetime
+import io
+import qrcode
 from fastapi import FastAPI, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import qrcode
-from fastapi.responses import StreamingResponse
 import psycopg2
 
 app = FastAPI(title="Control de Asistencia QR", debug=False)
@@ -49,7 +49,7 @@ def init_db():
         cursor = conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS asistentes (
-                codigo VARCHAR(255) PRIMARY KEY,
+                codigo VARCHAR(50) PRIMARY KEY,
                 nombre TEXT NOT NULL,
                 ingresado INTEGER DEFAULT 0,
                 timestamp TEXT
@@ -131,7 +131,7 @@ def dashboard_data():
         })
 
     return {"asistentes": asistentes_lista}
-# Endpoint para generar el QR visualmente desde el navegador
+
 @app.get("/api/generar-qr/{codigo}")
 def generar_qr(codigo: str):
     img = qrcode.make(codigo)
@@ -140,10 +140,6 @@ def generar_qr(codigo: str):
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/png")
 
-# ==========================================
-# VISTAS WEB
-# ==========================================
-# Endpoint para registrar un nuevo asistente desde la interfaz web de creación
 @app.post("/api/crear-asistente")
 def crear_asistente(codigo: str = Form(...), nombre: str = Form(...)):
     try:
@@ -160,7 +156,11 @@ def crear_asistente(codigo: str = Form(...), nombre: str = Form(...)):
         return {"status": "success", "message": f"Asistente {nombre} registrado correctamente"}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-    
+
+# ==========================================
+# VISTAS WEB
+# ==========================================
+
 @app.get("/", response_class=HTMLResponse)
 def leer_raiz(request: Request):
     try:
@@ -178,7 +178,8 @@ def ver_dashboard(request: Request):
     except Exception:
         with open("templates/admin.html", "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-        @app.get("/generador", response_class=HTMLResponse)
+
+@app.get("/generador", response_class=HTMLResponse)
 def ver_generador(request: Request):
     try:
         template = templates.get_template("generador.html")
@@ -187,7 +188,6 @@ def ver_generador(request: Request):
         with open("templates/generador.html", "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
 
-# Archivos estáticos básicos para PWA
 @app.get("/favicon.ico")
 def favicon():
     return JSONResponse(status_code=204, content={})
