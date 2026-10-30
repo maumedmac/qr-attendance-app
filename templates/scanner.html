@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escáner de Asistencia - QR</title>
+    <!-- Tailwind CSS CDN -->
+   <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    
+    <!-- Tailwind y scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col justify-between">
+
+    <!-- Header con enlace al Dashboard -->
+    <header class="bg-indigo-600 text-white shadow-md p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold">📷 Control de Asistencia QR</h1>
+        <a href="/dashboard" class="bg-indigo-700 hover:bg-indigo-800 px-4 py-2 rounded-lg text-sm font-semibold transition">
+            Ver Dashboard 📊
+        </a>
+    </header>
+
+    <!-- Contenido Principal -->
+    <main class="container mx-auto p-4 max-w-md flex-grow flex flex-col justify-center">
+        
+        <div class="bg-white rounded-xl shadow-lg p-6 space-y-6">
+            
+            <!-- Vista de la Cámara -->
+            <div>
+                <div id="reader" class="w-full rounded-lg overflow-hidden border-2 border-dashed border-gray-300"></div>
+            </div>
+
+            <!-- Entrada de Código (Manual / Pistola Láser / Escáner) -->
+            <div class="space-y-2">
+                <label for="codigo" class="block text-sm font-medium text-gray-700">Código del Asistente / Cédula:</label>
+                <div class="flex gap-2">
+                    <input type="text" id="codigo" autofocus placeholder="Escanee o escriba el código..." 
+                           class="flex-grow border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <button id="btnConsultar" onclick="consultarCodigo()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
+                        Consultar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Información del Asistente -->
+            <div id="infoBox" class="hidden bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2">
+                <p class="text-sm text-gray-500">Nombre del Asistente:</p>
+                <p id="nombreAsistente" class="text-lg font-bold text-gray-800">-</p>
+                <p class="text-sm text-gray-500">Estado actual:</p>
+                <p id="estadoAsistente" class="font-semibold">-</p>
+            </div>
+
+            <!-- Botones de Acción (Registrar deshabilitado por defecto) -->
+            <div class="grid grid-cols-2 gap-3">
+                <button id="btnRegistrar" onclick="registrarAsistencia()" disabled 
+                        class="bg-gray-300 text-gray-500 cursor-not-allowed py-3 rounded-lg font-bold transition">
+                    Registrar Ingreso
+                </button>
+                <button onclick="reiniciarEscanner()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-bold transition">
+                    Reiniciar
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Alerta Emergente (Modal personalizado) -->
+    <div id="modalAlerta" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+            <div id="modalIcon" class="text-4xl">✅</div>
+            <h3 id="modalTitle" class="text-xl font-bold text-gray-800">Título</h3>
+            <p id="modalMessage" class="text-gray-600 text-sm">Mensaje de la alerta...</p>
+            <button onclick="cerrarModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-semibold transition">
+                Aceptar
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-4 text-xs text-gray-500">
+        Sistema de Control de Asistencia &copy; 2026
+    </th></footer>
+
+    <!-- Lógica JavaScript -->
+    <script>
+        let codigoActual = "";
+
+        // Inicializar cámara con Html5QrcodeScanner
+        function onScanSuccess(decodedText, decodedResult) {
+            document.getElementById('codigo').value = decodedText;
+            consultarCodigo();
+        }
+
+        const html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", { fps: 10, qrbox: 250 }, false
+        );
+        html5QrcodeScanner.render(onScanSuccess);
+
+        // Permitir presionar ENTER en el input para consultar automáticamente
+        document.getElementById('codigo').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                consultarCodigo();
+            }
+        });
+
+        async function consultarCodigo() {
+            const codigo = document.getElementById('codigo').value.trim();
+            if (!codigo) {
+                mostrarModal("⚠️ Atención", "Por favor ingrese o escanee un código.", "⚠️");
+                return;
+            }
+
+            codigoActual = codigo;
+            const formData = new FormData();
+            formData.append('codigo', codigo);
+
+            try {
+                const response = await fetch('/api/consultar', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                const infoBox = document.getElementById('infoBox');
+                const nombreEl = document.getElementById('nombreAsistente');
+                const estadoEl = document.getElementById('estadoAsistente');
+                const btnRegistrar = document.getElementById('btnRegistrar');
+
+                infoBox.classList.remove('hidden');
+                nombreEl.textContent = data.nombre;
+
+                if (response.ok) {
+                    if (data.ya_ingreso) {
+                        estadoEl.innerHTML = `<span class="text-orange-600">⚠️ Ya ingresó anteriormente</span>`;
+                        btnRegistrar.disabled = true;
+                        btnRegistrar.className = "bg-gray-300 text-gray-500 cursor-not-allowed py-3 rounded-lg font-bold transition";
+                        mostrarModal("⚠️ Invitación Duplicada", `El usuario ${data.nombre} ya registró su ingreso con anterioridad.`, "⚠️");
+                    } else {
+                        estadoEl.innerHTML = `<span class="text-green-600">✅ Pendiente de ingreso</span>`;
+                        // Habilitar botón registrar estrictamente tras consultar si no ha entrado
+                        btnRegistrar.disabled = false;
+                        btnRegistrar.className = "bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold transition shadow-md";
+                    }
+                } else {
+                    estadoEl.innerHTML = `<span class="text-red-600">❌ No encontrado</span>`;
+                    nombreEl.textContent = "Código inválido o inexistente";
+                    btnRegistrar.disabled = true;
+                    btnRegistrar.className = "bg-gray-300 text-gray-500 cursor-not-allowed py-3 rounded-lg font-bold transition";
+                    mostrarModal("❌ Error", data.message, "❌");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                mostrarModal("❌ Error", "Error de conexión con el servidor.", "❌");
+            }
+        }
+
+        async function registrarAsistencia() {
+            if (!codigoActual) return;
+
+            const formData = new FormData();
+            formData.append('codigo', codigoActual);
+
+            try {
+                const response = await fetch('/api/registrar', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    mostrarModal("¡Ingreso Registrado!", `${data.message}\nHora exacta: ${data.hora}`, "✅");
+                    reiniciarEscanner();
+                } else {
+                    mostrarModal("⚠️ Advertencia", data.message, "⚠️");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                mostrarModal("❌ Error", "No se pudo registrar la asistencia.", "❌");
+            }
+        }
+
+        function reiniciarEscanner() {
+            codigoActual = "";
+            document.getElementById('codigo').value = "";
+            document.getElementById('infoBox').classList.add('hidden');
+            document.getElementById('nombreAsistente').textContent = "-";
+            document.getElementById('estadoAsistente').textContent = "-";
+            
+            const btnRegistrar = document.getElementById('btnRegistrar');
+            btnRegistrar.disabled = true;
+            btnRegistrar.className = "bg-gray-300 text-gray-500 cursor-not-allowed py-3 rounded-lg font-bold transition";
+            document.getElementById('codigo').focus();
+        }
+
+        function mostrarModal(titulo, mensaje, icono) {
+            document.getElementById('modalTitle').textContent = titulo;
+            document.getElementById('modalMessage').textContent = mensaje;
+            document.getElementById('modalIcon').textContent = icono;
+            document.getElementById('modalAlerta').classList.remove('hidden');
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalAlerta').classList.add('hidden');
+        }
+    </script>
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(reg => console.log('Service Worker registrado con éxito', reg))
+                .catch(err => console.log('Error al registrar Service Worker', err));
+        });
+    }
+</script>
+</body>
+</html>

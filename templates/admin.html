@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Asistencia</title>
+    <!-- Tailwind CSS CDN -->
+    <!-- Enlace al Manifest para PWA -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    
+    <!-- Tailwind y scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col justify-between">
+
+    <!-- Header con enlace de regreso al Escáner -->
+    <header class="bg-indigo-600 text-white shadow-md p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold">📊 Panel de Control - Asistencia</h1>
+        <a href="/" class="bg-indigo-700 hover:bg-indigo-800 px-4 py-2 rounded-lg text-sm font-semibold transition">
+            📷 Ir al Escáner
+        </a>
+    </header>
+
+    <!-- Contenido Principal -->
+    <main class="container mx-auto p-4 max-w-4xl flex-grow space-y-6">
+        
+        <!-- Tarjetas de Resumen Estadístico -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-blue-500">
+                <p class="text-sm font-medium text-gray-500">Total Invitados</p>
+                <p id="totalRegistros" class="text-3xl font-extrabold text-gray-800">0</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-green-500">
+                <p class="text-sm font-medium text-gray-500">Han Ingresado</p>
+                <p id="totalIngresados" class="text-3xl font-extrabold text-green-600">0</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-orange-500">
+                <p class="text-sm font-medium text-gray-500">Pendientes</p>
+                <p id="totalPendientes" class="text-3xl font-extrabold text-orange-500">0</p>
+            </div>
+        </div>
+
+        <!-- Barra de Control: Buscador y Botón de Recarga -->
+        <div class="bg-white p-4 rounded-xl shadow-md flex flex-col sm:flex-row gap-3 justify-between items-center">
+            <input type="text" id="inputBuscar" oninput="filtrarTabla()" placeholder="🔍 Buscar por nombre o código..." 
+                   class="w-full sm:w-1/2 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            
+            <button onclick="cargarDatosDashboard()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-medium transition flex items-center justify-center gap-2">
+                🔄 Actualizar Datos
+            </button>
+        </div>
+
+        <!-- Tabla de Asistentes -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-700 uppercase text-xs tracking-wider border-b border-gray-200">
+                            <th class="py-3 px-4">Código / CI</th>
+                            <th class="py-3 px-4">Nombre del Asistente</th>
+                            <th class="py-3 px-4">Estado</th>
+                            <th class="py-3 px-4">Hora de Ingreso</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaCuerpo" class="divide-y divide-gray-200 text-sm">
+                        <!-- Se puebla dinámicamente desde JavaScript -->
+                        <tr>
+                            <td colspan="4" class="py-6 text-center text-gray-400">Cargando datos...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-4 text-xs text-gray-500">
+        Sistema de Control de Asistencia &copy; 2026
+    </footer>
+
+    <!-- Lógica JavaScript -->
+    <script>
+        let todosLosAsistentes = [];
+
+        // Cargar datos al iniciar la página
+        document.addEventListener("DOMContentLoaded", cargarDatosDashboard);
+
+        async function cargarDatosDashboard() {
+            try {
+                const response = await fetch('/api/dashboard-data');
+                if (!response.ok) throw new Error("Error en la respuesta del servidor");
+                
+                const data = await response.json();
+                todosLosAsistentes = data.asistentes || [];
+
+                actualizarMetricas();
+                renderizarTabla(todosLosAsistentes);
+
+            } catch (error) {
+                console.error("Error al obtener datos:", error);
+                document.getElementById('tablaCuerpo').innerHTML = `
+                    <tr>
+                        <td colspan="4" class="py-6 text-center text-red-500 font-semibold">
+                            ❌ No se pudieron cargar los datos del servidor.
+                        </td>
+                    </tr>`;
+            }
+        }
+
+        function actualizarMetricas() {
+            const total = todosLosAsistentes.length;
+            const ingresados = todosLosAsistentes.filter(a => a.status === 'Entró').length;
+            const pendientes = total - ingresados;
+
+            document.getElementById('totalRegistros').textContent = total;
+            document.getElementById('totalIngresados').textContent = ingresados;
+            document.getElementById('totalPendientes').textContent = pendientes;
+        }
+
+        function renderizarTabla(lista) {
+            const tablaCuerpo = document.getElementById('tablaCuerpo');
+            tablaCuerpo.innerHTML = "";
+
+            if (lista.length === 0) {
+                tablaCuerpo.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="py-6 text-center text-gray-400">
+                            No se encontraron registros.
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            lista.forEach(asistente => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition";
+
+                const esEntro = asistente.status === "Entró";
+                const badgeClass = esEntro 
+                    ? "bg-green-100 text-green-800 font-semibold" 
+                    : "bg-orange-100 text-orange-800 font-semibold";
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono font-medium text-gray-700">${asistente.codigo}</td>
+                    <td class="py-3 px-4 font-semibold text-gray-800">${asistente.name}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2.5 py-1 rounded-full text-xs ${badgeClass}">
+                            ${asistente.status}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-gray-500 font-mono">${asistente.timestamp}</td>
+                `;
+                tablaCuerpo.appendChild(tr);
+            });
+        }
+
+        function filtrarTabla() {
+            const busqueda = document.getElementById('inputBuscar').value.toLowerCase().trim();
+            const filtrados = todosLosAsistentes.filter(a => 
+                a.name.toLowerCase().includes(busqueda) || 
+                a.codigo.toLowerCase().includes(busqueda)
+            );
+            renderizarTabla(filtrados);
+        }
+    </script>
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(reg => console.log('Service Worker registrado con éxito', reg))
+                .catch(err => console.log('Error al registrar Service Worker', err));
+        });
+    }
+</script>
+</body>
+</html>
