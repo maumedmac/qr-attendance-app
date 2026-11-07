@@ -132,7 +132,7 @@ def dashboard_data():
 
     return {"asistentes": asistentes_lista}
 
-@app.get("/api/generar-qr/{codigo}")
+@app.get("/api/generar-qr/{codigo}-14/11")
 def generar_qr(codigo: str):
     img = qrcode.make(codigo)
     buf = io.BytesIO()
